@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>煩惱垃圾桶 - 投走煩惱</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      background: radial-gradient(circle at center, #fbf7ee 0%, #ecdcc9 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 頂部標題 */
+    header {
+      padding-top: 24px;
+      text-align: center;
+      z-index: 10;
+    }
+    header h1 {
+      font-size: 26px;
+      color: #3e3228;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    header p {
+      font-size: 15px;
+      color: #7c6a59;
+      margin-top: 6px;
+    }
+
+    /* 主舞台區域 */
+    .stage {
+      position: relative;
+      width: 100vw;
+      max-width: 500px;
+      height: 70vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* 大信紙區域 */
+    .paper-sheet {
+      width: 86%;
+      min-height: 280px;
+      background: #fffdf9;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(85, 65, 45, 0.15), 0 2px 6px rgba(0,0,0,0.06);
+      border: 1px solid #ebd8c1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+      z-index: 20;
+    }
+    .paper-lines {
+      background-image: repeating-linear-gradient(transparent, transparent 31px, #e8dfd5 31px, #e8dfd5 32px);
+      line-height: 32px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .paper-sheet textarea {
+      width: 100%;
+      height: 180px;
+      border: none;
+      background: transparent;
+      resize: none;
+      outline: none;
+      font-size: 19px;
+      line-height: 32px;
+      color: #3b2f27;
+      font-family: inherit;
+      user-select: auto;
+    }
+    .crumple-btn {
+      margin-top: 14px;
+      padding: 12px;
+      background: #d46b4f;
+      color: #fff;
+      font-size: 17px;
+      font-weight: bold;
+      border: none;
+      border-radius: 28px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(212, 107, 79, 0.35);
+      transition: transform 0.1s ease, background 0.2s ease;
+    }
+    .crumple-btn:active {
+      transform: scale(0.97);
+      background: #bf5b40;
+    }
+
+    /* 揉成紙團的動畫形變 */
+    .paper-sheet.crumpling {
+      animation: paperToBall 0.8s forwards cubic-bezier(0.5, 0, 0.2, 1);
+    }
+    @keyframes paperToBall {
+      0% { transform: scale(1) rotate(0deg); border-radius: 12px; }
+      40% { transform: scale(0.6) rotate(15deg) skewX(20deg); filter: contrast(1.2); }
+      75% { transform: scale(0.25) rotate(-35deg) skewY(-20deg); border-radius: 40%; }
+      100% { transform: scale(0) rotate(180deg); opacity: 0; }
+    }
+
+    /* 投球用實體紙團 */
+    .paper-ball {
+      width: 72px;
+      height: 72px;
+      position: absolute;
+      bottom: 25px;
+      left: calc(50% - 36px);
+      z-index: 30;
+      cursor: grab;
+      touch-action: none;
+      display: none;
+      filter: drop-shadow(0 8px 10px rgba(0,0,0,0.25));
+    }
+    .paper-ball:active {
+      cursor: grabbing;
+    }
+    .ball-texture {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #dedede 60%, #b3b3b3 100%);
+      clip-path: polygon(25% 5%, 75% 0%, 95% 30%, 100% 70%, 80% 95%, 45% 100%, 10% 85%, 0% 50%, 10% 20%);
+      box-shadow: inset -4px -4px 10px rgba(0,0,0,0.2);
+    }
+    .aim-tip {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: bold;
+      color: #9c6644;
+      background: rgba(255,255,255,0.9);
+      padding: 3px 10px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      pointer-events: none;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-5px); }
+    }
+
+    /* 移動垃圾桶 */
+    .trash-area {
+      position: relative;
+      width: 100%;
+      height: 140px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      z-index: 5;
+    }
+    .trash-bin-wrap {
+      position: absolute;
+      bottom: 10px;
+      width: 90px;
+      height: 100px;
+      transition: transform 0.05s linear;
+    }
+    .trash-bin {
+      font-size: 80px;
+      text-align: center;
+      line-height: 1;
+      filter: drop-shadow(0 10px 15px rgba(0,0,0,0.15));
+    }
+    .hoop-target {
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      width: 60px;
+      height: 25px;
+      border-radius: 50%;
+      border: 2px dashed rgba(220, 53, 69, 0.4);
+    }
+
+    /* 結果回饋卡片 */
+    .result-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .result-card {
+      background: #fffcf7;
+      border-radius: 20px;
+      padding: 26px 22px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      border: 1px solid #ebd7bf;
+      text-align: left;
+      animation: popIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+    @keyframes popIn {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .result-card h3 {
+      font-size: 21px;
+      color: #3b5a45;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .result-content {
+      font-size: 18px;
+      line-height: 1.7;
+      color: #3a2e26;
+      max-height: 240px;
+      overflow-y: auto;
+      padding-right: 4px;
+      word-break: break-word;
+    }
+    .action-group {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .tts-btn {
+      background: #e76f51;
+      color: #fff;
+      font-size: 17px;
+      font-weight: bold;
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .reset-btn {
+      background: #f0eae1;
+      color: #635345;
+      font-size: 16px;
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    /* 投擲軌跡輔助線 */
+    .drag-indicator {
+      position: absolute;
+      pointer-events: none;
+      border-left: 2px dashed #e76f51;
+      display: none;
+      z-index: 25;
+      transform-origin: bottom center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1 id="title-text">🗑️ 煩惱垃圾桶</h1>
+    <p id="desc-text">寫下心中的煩躁，揉成紙團丟進去吧！</p>
+  </header>
+
+  <div class="stage">
+    <!-- 移動垃圾桶 -->
+    <div class="trash-area">
+      <div class="trash-bin-wrap" id="trashBin">
+        <div class="hoop-target"></div>
+        <div class="trash-bin">🗑️</div>
+      </div>
+    </div>
+
+    <!-- 原始大信紙 -->
+    <div class="paper-sheet" id="paperSheet">
+      <div class="paper-lines">
+        <textarea id="worryInput" placeholder="在這裡寫下今天讓你煩惱、牽掛的事...&#10;寫完後點下方按鈕揉成紙團！"></textarea>
+      </div>
+      <button class="crumple-btn" id="crumpleBtn">✊ 把它揉成紙團</button>
+    </div>
+
+    <!-- 投籃紙團 -->
+    <div class="paper-ball" id="paperBall">
+      <div class="aim-tip">往上滑瞄準丟進去！</div>
+      <div class="ball-texture"></div>
+    </div>
+  </div>
+
+  <div class="drag-indicator" id="dragLine"></div>
+
+  <!-- 結果回饋覆蓋層 -->
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <h3>🌱 幸福助教的溫暖發現：</h3>
+      <div class="result-content" id="resultText">正在轉念中...</div>
+      <div class="action-group">
+        <button class="tts-btn" id="ttsBtn">🔊 唸給我聽</button>
+        <button class="reset-btn" id="resetBtn">再丟一個煩惱</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ⚠️ 務必填入你在 Make.com 啟用的 Webhook URL
+    const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/你的專屬網址";
+
+    const paperSheet = document.getElementById('paperSheet');
+    const worryInput = document.getElementById('worryInput');
+    const crumpleBtn = document.getElementById('crumpleBtn');
+    const paperBall = document.getElementById('paperBall');
+    const trashBin = document.getElementById('trashBin');
+    const titleText = document.getElementById('title-text');
+    const descText = document.getElementById('desc-text');
+    const resultOverlay = document.getElementById('resultOverlay');
+    const resultText = document.getElementById('resultText');
+    const ttsBtn = document.getElementById('ttsBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let currentWorry = "";
+    let isAimingMode = false;
+    let binDirection = 1;
+    let binPos = 0;
+    let binAnimFrame;
+
+    // 1. 垃圾桶左右擺動邏輯（增加投籃挑戰性）
+    function animateTrashBin() {
+      const stageWidth = Math.min(window.innerWidth, 500);
+      const maxOffset = (stageWidth / 2) - 60;
+
+      binPos += 1.2 * binDirection;
+      if (binPos > maxOffset) binDirection = -1;
+      if (binPos < -maxOffset) binDirection = 1;
+
+      trashBin.style.transform = `translateX(${binPos}px)`;
+      binAnimFrame = requestAnimationFrame(animateTrashBin);
+    }
+    animateTrashBin();
+
+    // 2. 點擊揉紙團：信紙收縮變形並呼叫實體紙團
+    crumpleBtn.addEventListener('click', () => {
+      const text = worryInput.value.trim();
+      if (!text) {
+        alert("請先寫下一點煩惱再揉掉喔！");
+        return;
+      }
+      currentWorry = text;
+
+      // 觸發信紙皺縮動畫
+      paperSheet.classList.add('crumpling');
+
+      setTimeout(() => {
+        paperSheet.style.display = 'none';
+        paperBall.style.display = 'block';
+        isAimingMode = true;
+        titleText.innerText = "🎯 投籃時間！";
+        descText.innerText = "按住紙團，往上滑動瞄準丟進垃圾桶！";
+        initBallPhysics();
+      }, 750);
+    });
+
+    // 3. 紙團投籃物理與滑動偵測
+    let startY = 0, startX = 0;
+    let isDragging = false;
+    let hasThrown = false;
+
+    function initBallPhysics() {
+      hasThrown = false;
+      paperBall.style.transform = 'translate(0, 0) scale(1)';
+      paperBall.style.transition = 'none';
+
+      paperBall.addEventListener('pointerdown', onPointerDown);
+    }
+
+    function onPointerDown(e) {
+      if (hasThrown) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      paperBall.setPointerCapture(e.pointerId);
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging || hasThrown) return;
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      // 限制拖曳範圍（僅微幅拉動代表拉弓瞄準）
+      paperBall.style.transform = `translate(${deltaX * 0.4}px, ${deltaY * 0.4}px)`;
+    }
+
+    function onPointerUp(e) {
+      if (!isDragging || hasThrown) return;
+      isDragging = false;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      // 向上快速滑動發動投擲
+      if (deltaY < -30) {
+        throwBall(deltaX, deltaY);
+      } else {
+        // 回彈原位
+        paperBall.style.transition = 'transform 0.2s ease-out';
+        paperBall.style.transform = 'translate(0, 0)';
+      }
+    }
+
+    function throwBall(dragX, dragY) {
+      hasThrown = true;
+      const rectStage = document.querySelector('.stage').getBoundingClientRect();
+      const rectBin = trashBin.getBoundingClientRect();
+
+      // 計算紙團終點位置（根據滑動方向）
+      const throwSpeed = Math.min(Math.abs(dragY) * 2, 450);
+      const throwTargetY = -(throwSpeed + 150);
+      const throwTargetX = dragX * 2;
+
+      paperBall.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      paperBall.style.transform = `translate(${throwTargetX}px, ${throwTargetY}px) scale(0.55) rotate(720deg)`;
+
+      // 判斷是否命中垃圾桶
+      setTimeout(() => {
+        const ballRect = paperBall.getBoundingClientRect();
+        const binRect = trashBin.getBoundingClientRect();
+
+        // X 軸重疊判定
+        const isHit = Math.abs((ballRect.left + ballRect.width / 2) - (binRect.left + binRect.width / 2)) < 55;
+
+        if (isHit) {
+          // 進球效果：紙團落下並消失
+          paperBall.style.transition = 'transform 0.25s ease-in, opacity 0.25s';
+          paperBall.style.transform = `translate(${binPos}px, ${throwTargetY + 40}px) scale(0.2)`;
+          paperBall.style.opacity = '0';
+
+          sendWorryToAI(currentWorry);
+        } else {
+          // 投空彈飛效果
+          paperBall.style.transition = 'transform 0.4s ease-out';
+          paperBall.style.transform = `translate(${throwTargetX + 40}px, 0px) scale(0.7)`;
+          setTimeout(() => {
+            alert("差一點！沒投進去，再試一次～瞄準垃圾桶！");
+            paperBall.style.transition = 'none';
+            paperBall.style.transform = 'translate(0, 0) scale(1)';
+            hasThrown = false;
+          }, 450);
+        }
+      }, 600);
+    }
+
+    // 4. 打後端 API 發送轉念
+    async function sendWorryToAI(text) {
+      resultOverlay.style.display = 'flex';
+      resultText.innerText = "🍃 煩惱已丟棄！幸福助教正在為您轉念中...";
+
+      try {
+        const response = await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+
+        const data = await response.text();
+        let reply = data;
+        try {
+          const json = JSON.parse(data);
+          if (json.reply) reply = json.reply;
+        } catch (e) {}
+
+        resultText.innerText = reply;
+      } catch (err) {
+        resultText.innerText = "助教目前正在休息，請稍後再試一次！";
+      }
+    }
+
+    // 5. 語音朗讀
+    ttsBtn.addEventListener('click', () => {
+      const text = resultText.innerText;
+      if (!text || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-TW';
+      utterance.rate = 0.85; // 稍微調慢語速，方便長輩聆聽
+      window.speechSynthesis.speak(utterance);
+    });
+
+    // 6. 重置狀態，再丟一次
+    resetBtn.addEventListener('click', () => {
+      window.speechSynthesis.cancel();
+      resultOverlay.style.display = 'none';
+      paperBall.style.display = 'none';
+      paperBall.style.opacity = '1';
+      paperSheet.classList.remove('crumpling');
+      paperSheet.style.display = 'flex';
+      worryInput.value = '';
+      titleText.innerText = "🗑️ 煩惱垃圾桶";
+      descText.innerText = "寫下心中的煩躁，揉成紙團丟進去吧！";
+    });
+  </script>
+</body>
+</html>
